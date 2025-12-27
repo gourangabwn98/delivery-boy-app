@@ -321,7 +321,7 @@ const DeliveryBoyPanel = () => {
                         textDecoration: "none",
                         boxShadow: "0 8px 20px rgba(37,99,235,0.4)",
                         transition: "all 0.3s",
-                        display: "flex",
+
                         alignItems: "center",
                         justifyContent: "center",
                         gap: "16px",
