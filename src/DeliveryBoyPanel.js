@@ -3,7 +3,6 @@ import {
   Truck,
   Phone,
   MapPin,
-  IndianRupee,
   ShoppingBag,
   ExternalLink,
   RefreshCw,
