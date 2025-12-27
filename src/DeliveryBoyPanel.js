@@ -22,6 +22,7 @@ const DeliveryBoyPanel = () => {
   const [showHistory, setShowHistory] = useState(false);
   const [deliveryHistory, setDeliveryHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [confirmOrderId, setConfirmOrderId] = useState(null);
 
   const playRingtone = () => {
     const audio = new Audio(RINGTONE_URL);
@@ -76,6 +77,7 @@ const DeliveryBoyPanel = () => {
   // Mark as Delivered
   const markAsDelivered = async (orderId) => {
     setUpdatingId(orderId);
+    setConfirmOrderId(null);
     try {
       const res = await fetch(
         `${API_BASE_URL}/api/admin/orders/${orderId}/status`,
@@ -451,30 +453,55 @@ const DeliveryBoyPanel = () => {
                     )}
 
                     {/* Mark Delivered Button */}
-                    <button
-                      onClick={() => markAsDelivered(order._id)}
-                      disabled={updatingId === order._id}
-                      style={{
-                        flex: 1,
-                        background: "#10b981",
-                        color: "white",
-                        fontSize: "24px",
-                        fontWeight: "bold",
-                        padding: "22px",
-                        borderRadius: "24px",
-                        border: "none",
-                        cursor: "pointer",
-                        boxShadow: "0 10px 30px rgba(16,185,129,0.4)",
-                        opacity: updatingId === order._id ? 0.7 : 1,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: "12px",
-                      }}
-                    >
-                      <CheckCircle size={28} />
-                      MARK DELIVERED
-                    </button>
+                    {confirmOrderId === order._id ? (
+                      <button
+                        onClick={() => markAsDelivered(order._id)}
+                        disabled={updatingId === order._id}
+                        style={{
+                          flex: 1,
+                          background: "#ef4444",
+                          color: "white",
+                          fontSize: "20px",
+                          fontWeight: "bold",
+                          padding: "22px",
+                          borderRadius: "24px",
+                          border: "none",
+                          cursor: "pointer",
+                          boxShadow: "0 10px 30px rgba(239,68,68,0.4)",
+                          opacity: updatingId === order._id ? 0.7 : 1,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "12px",
+                        }}
+                      >
+                        <CheckCircle size={28} />
+                        CONFIRM DELIVERY
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmOrderId(order._id)}
+                        style={{
+                          flex: 1,
+                          background: "#10b981",
+                          color: "white",
+                          fontSize: "24px",
+                          fontWeight: "bold",
+                          padding: "22px",
+                          borderRadius: "24px",
+                          border: "none",
+                          cursor: "pointer",
+                          boxShadow: "0 10px 30px rgba(16,185,129,0.4)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "12px",
+                        }}
+                      >
+                        <CheckCircle size={28} />
+                        MARK DELIVERED
+                      </button>
+                    )}
                   </div>
                 </div>
               );
