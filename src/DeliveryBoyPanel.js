@@ -6,15 +6,22 @@ import {
   ShoppingBag,
   ExternalLink,
   RefreshCw,
+  CheckCircle,
+  History,
+  X,
 } from "lucide-react";
 
 const API_BASE_URL = "https://zombo.onrender.com";
-const RINGTONE_URL = "/notification.mp3"; // Place notification.mp3 in public folder
+const RINGTONE_URL = "/notification.mp3";
 
 const DeliveryBoyPanel = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [previousCount, setPreviousCount] = useState(0);
+  const [updatingId, setUpdatingId] = useState(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [deliveryHistory, setDeliveryHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const playRingtone = () => {
     const audio = new Audio(RINGTONE_URL);
@@ -26,18 +33,18 @@ const DeliveryBoyPanel = () => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/admin/orders`);
       const data = await res.json();
-
       if (data.success && Array.isArray(data.orders)) {
-        const pendingOrders = data.orders
-          .filter((o) => o.status !== "Delivered" && o.status !== "Cancelled")
-          .reverse();
+        // Filter ONLY "Accepted" status orders
+        const acceptedOrders = data.orders
+          .filter((o) => o.status === "Accepted")
+          .reverse(); // newest first
 
-        setOrders(pendingOrders);
+        setOrders(acceptedOrders);
 
-        if (pendingOrders.length > previousCount && previousCount > 0) {
+        if (acceptedOrders.length > previousCount && previousCount > 0) {
           playRingtone();
         }
-        setPreviousCount(pendingOrders.length);
+        setPreviousCount(acceptedOrders.length);
       }
     } catch (err) {
       console.error("Fetch error:", err);
@@ -45,6 +52,50 @@ const DeliveryBoyPanel = () => {
       setLoading(false);
     }
   }, [previousCount]);
+
+  // Fetch delivery history
+  const fetchDeliveryHistory = async () => {
+    setHistoryLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/orders`);
+      const data = await res.json();
+      if (data.success && Array.isArray(data.orders)) {
+        // Filter only delivered orders
+        const delivered = data.orders
+          .filter((o) => o.status === "Delivered")
+          .reverse(); // newest first
+        setDeliveryHistory(delivered);
+      }
+    } catch (err) {
+      console.error("History fetch error:", err);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  // Mark as Delivered
+  const markAsDelivered = async (orderId) => {
+    setUpdatingId(orderId);
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/api/admin/orders/${orderId}/status`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "Delivered" }),
+        }
+      );
+      if (res.ok) {
+        setOrders((prev) => prev.filter((o) => o._id !== orderId));
+      } else {
+        alert("Failed to update status");
+      }
+    } catch (err) {
+      alert("Network error");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
 
   useEffect(() => {
     fetchOrders();
@@ -57,21 +108,17 @@ const DeliveryBoyPanel = () => {
       <div
         style={{
           display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
           justifyContent: "center",
-          minHeight: "100vh",
-          background: "#111827",
+          alignItems: "center",
+          height: "100vh",
+          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
           color: "white",
+          fontSize: "24px",
+          fontWeight: "bold",
         }}
       >
-        <RefreshCw
-          size={64}
-          style={{ animation: "spin 2s linear infinite", color: "#fbbf24" }}
-        />
-        <h1 style={{ fontSize: "28px", marginTop: "24px", fontWeight: "bold" }}>
-          Loading Orders...
-        </h1>
+        <RefreshCw size={32} style={{ animation: "spin 1s linear infinite" }} />
+        Loading Orders...
       </div>
     );
   }
@@ -80,64 +127,100 @@ const DeliveryBoyPanel = () => {
     <div
       style={{
         minHeight: "100vh",
-        background: "linear-gradient(to bottom, #0f172a, #1e293b)",
-        color: "white",
+        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
         paddingBottom: "40px",
       }}
     >
       {/* Fixed Header */}
-      <header
+      <div
         style={{
-          background: "#000",
-          padding: "20px",
-          textAlign: "center",
-          position: "fixed",
+          position: "sticky",
           top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 10,
-          boxShadow: "0 4px 10px rgba(0,0,0,0.5)",
+          zIndex: 100,
+          background: "rgba(255,255,255,0.98)",
+          backdropFilter: "blur(12px)",
+          borderBottom: "3px solid #667eea",
+          padding: "20px",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
         }}
       >
         <div
           style={{
             display: "flex",
+            justifyContent: "space-between",
             alignItems: "center",
-            justifyContent: "center",
-            gap: "16px",
+            maxWidth: "900px",
+            margin: "0 auto",
           }}
         >
-          <Truck size={40} style={{ color: "#fbbf24" }} />
-          <h1 style={{ fontSize: "28px", fontWeight: "bold", margin: 0 }}>
-            Delivery Boy Panel
-          </h1>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main style={{ marginTop: "100px", padding: "0 16px" }}>
-        {orders.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "80px 20px" }}>
-            <ShoppingBag
-              size={100}
-              style={{ opacity: 0.3, marginBottom: "24px" }}
-            />
-            <h2
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <Truck size={32} color="#667eea" />
+            <h1
               style={{
-                fontSize: "32px",
+                margin: 0,
+                fontSize: "28px",
                 fontWeight: "bold",
-                marginBottom: "16px",
+                color: "#1f2937",
               }}
             >
-              No Pending Orders
+              Delivery Panel
+            </h1>
+          </div>
+          <button
+            onClick={() => {
+              setShowHistory(true);
+              fetchDeliveryHistory();
+            }}
+            style={{
+              background: "#667eea",
+              color: "white",
+              border: "none",
+              padding: "12px 24px",
+              borderRadius: "12px",
+              fontSize: "16px",
+              fontWeight: "600",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              boxShadow: "0 4px 12px rgba(102,126,234,0.3)",
+            }}
+          >
+            <History size={20} />
+            History
+          </button>
+        </div>
+      </div>
+
+      {/* Orders List */}
+      <div style={{ maxWidth: "900px", margin: "0 auto", padding: "20px" }}>
+        {orders.length === 0 ? (
+          <div
+            style={{
+              background: "white",
+              borderRadius: "24px",
+              padding: "60px 20px",
+              textAlign: "center",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
+            }}
+          >
+            <Truck
+              size={64}
+              color="#d1d5db"
+              style={{ margin: "0 auto 20px" }}
+            />
+            <h2
+              style={{ color: "#6b7280", fontSize: "24px", margin: "0 0 8px" }}
+            >
+              No Active Orders
             </h2>
-            <p style={{ fontSize: "20px", color: "#94a3b8" }}>
-              New orders will appear automatically 🚀
+            <p style={{ color: "#9ca3af", fontSize: "18px", margin: 0 }}>
+              Waiting for new orders... 🚀
             </p>
           </div>
         ) : (
           <div
-            style={{ display: "flex", flexDirection: "column", gap: "24px" }}
+            style={{ display: "flex", flexDirection: "column", gap: "20px" }}
           >
             {orders.map((order, index) => {
               const addressLines = (order.address || "").split("\n");
@@ -147,83 +230,98 @@ const DeliveryBoyPanel = () => {
                 <div
                   key={order._id}
                   style={{
-                    position: "relative",
                     background: "white",
-                    color: "#000",
                     borderRadius: "24px",
                     padding: "24px",
-                    boxShadow: "0 10px 30px rgba(0,0,0,0.3)",
-                    border: isNew ? "4px solid #fbbf24" : "none",
-                    animation: isNew ? "pulse 2s infinite" : "none",
+                    boxShadow: isNew
+                      ? "0 12px 40px rgba(102,126,234,0.4)"
+                      : "0 8px 32px rgba(0,0,0,0.12)",
+                    border: isNew ? "3px solid #667eea" : "none",
+                    position: "relative",
+                    animation: isNew ? "pulse 2s ease-in-out infinite" : "none",
                   }}
                 >
-                  {/* New Order Badge */}
+                  {/* New Badge */}
                   {isNew && (
                     <div
                       style={{
                         position: "absolute",
-                        top: "-16px",
-                        left: "50%",
-                        transform: "translateX(-50%)",
-                        background: "#dc2626",
+                        top: "-12px",
+                        right: "20px",
+                        background: "#ef4444",
                         color: "white",
-                        padding: "8px 24px",
-                        borderRadius: "50px",
+                        padding: "8px 20px",
+                        borderRadius: "20px",
+                        fontSize: "14px",
                         fontWeight: "bold",
-                        fontSize: "18px",
-                        boxShadow: "0 4px 10px rgba(0,0,0,0.3)",
+                        boxShadow: "0 4px 12px rgba(239,68,68,0.4)",
                       }}
                     >
                       NEW ORDER!
                     </div>
                   )}
 
-                  {/* Customer Info */}
+                  {/* Status Badge */}
+                  <div
+                    style={{
+                      display: "inline-block",
+                      background: "#10b981",
+                      color: "white",
+                      padding: "8px 16px",
+                      borderRadius: "12px",
+                      fontSize: "14px",
+                      fontWeight: "600",
+                      marginBottom: "16px",
+                    }}
+                  >
+                    {order.status || "Accepted"}
+                  </div>
+
+                  {/* Customer + Amount */}
                   <div
                     style={{
                       display: "flex",
-                      flexDirection: "column",
-                      gap: "16px",
-                      marginBottom: "24px",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                      marginBottom: "20px",
+                      flexWrap: "wrap",
+                      gap: "12px",
                     }}
                   >
                     <div>
-                      <h3
+                      <div
                         style={{
-                          fontSize: "24px",
+                          fontSize: "22px",
                           fontWeight: "bold",
-                          margin: "0 0 8px 0",
+                          color: "#1f2937",
+                          marginBottom: "4px",
                         }}
                       >
                         {order.user?.name || "Customer"}
-                      </h3>
-                      <a
-                        href={`tel:${order.user?.phone}`}
+                      </div>
+                      <div
                         style={{
                           display: "flex",
                           alignItems: "center",
-                          gap: "12px",
-                          color: "#2563eb",
-                          fontSize: "20px",
-                          fontWeight: "600",
-                          textDecoration: "none",
+                          gap: "6px",
+                          color: "#6b7280",
                         }}
                       >
-                        <Phone size={24} />
+                        <Phone size={16} />
                         {order.user?.phone || "No phone"}
-                      </a>
+                      </div>
                     </div>
                     <div style={{ textAlign: "right" }}>
                       <div
                         style={{
-                          fontSize: "36px",
+                          fontSize: "28px",
                           fontWeight: "bold",
-                          color: "#059669",
+                          color: "#667eea",
                         }}
                       >
                         ₹{order.totalAmount}
                       </div>
-                      <div style={{ color: "#6b7280", fontSize: "14px" }}>
+                      <div style={{ fontSize: "14px", color: "#9ca3af" }}>
                         {new Date(order.createdAt).toLocaleTimeString("en-IN")}
                       </div>
                     </div>
@@ -232,77 +330,44 @@ const DeliveryBoyPanel = () => {
                   {/* Items */}
                   <div
                     style={{
-                      background: "#f3f4f6",
+                      background: "#f9fafb",
                       borderRadius: "16px",
                       padding: "16px",
-                      marginBottom: "24px",
+                      marginBottom: "20px",
                     }}
                   >
-                    <h4
+                    <div
                       style={{
-                        fontWeight: "bold",
-                        fontSize: "18px",
-                        margin: "0 0 12px 0",
                         display: "flex",
                         alignItems: "center",
                         gap: "8px",
+                        marginBottom: "12px",
+                        color: "#374151",
+                        fontWeight: "600",
                       }}
                     >
                       <ShoppingBag size={20} />
-                      Order Items
-                    </h4>
+                      Items
+                    </div>
                     {(order.items || []).map((item, i) => (
                       <div
                         key={i}
                         style={{
-                          display: "flex",
-                          justifyContent: "space-between",
                           padding: "8px 0",
                           borderBottom:
                             i < order.items.length - 1
                               ? "1px solid #e5e7eb"
                               : "none",
+                          fontSize: "16px",
+                          color: "#1f2937",
                         }}
                       >
-                        <span style={{ fontWeight: "500" }}>{item.name}</span>
-                        <span style={{ color: "#4b5563", fontWeight: "bold" }}>
-                          × {item.quantity}
-                        </span>
+                        <strong>{item.name}</strong> × {item.quantity}
                       </div>
                     ))}
                   </div>
 
-                  {/* Address */}
-                  <div style={{ marginBottom: "32px" }}>
-                    <h4
-                      style={{
-                        fontWeight: "bold",
-                        fontSize: "18px",
-                        marginBottom: "12px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                      }}
-                    >
-                      <MapPin size={24} style={{ color: "#dc2626" }} />
-                      Delivery Address
-                    </h4>
-                    <div
-                      style={{
-                        background: "#f3f4f6",
-                        padding: "16px",
-                        borderRadius: "16px",
-                        color: "#374151",
-                        lineHeight: "1.6",
-                      }}
-                    >
-                      {addressLines.map((line, i) => (
-                        <div key={i}>{line || "—"}</div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Map Button */}
+                  {/* Clickable Address */}
                   {order.lat && order.lng ? (
                     <a
                       href={`https://www.google.com/maps?q=${order.lat},${order.lng}`}
@@ -310,52 +375,329 @@ const DeliveryBoyPanel = () => {
                       rel="noopener noreferrer"
                       style={{
                         display: "block",
-                        width: "100%",
-                        background: "#2563eb",
-                        color: "white",
-                        fontSize: "22px",
-                        fontWeight: "bold",
-                        padding: "20px",
-                        borderRadius: "20px",
-                        textAlign: "center",
+                        background: "#fef3c7",
+                        borderRadius: "16px",
+                        padding: "16px",
+                        marginBottom: "20px",
                         textDecoration: "none",
-                        boxShadow: "0 8px 20px rgba(37,99,235,0.4)",
-                        transition: "all 0.3s",
-
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: "16px",
+                        color: "#92400e",
+                        border: "2px solid #fbbf24",
                       }}
-                      onMouseOver={(e) =>
-                        (e.target.style.background = "#1d4ed8")
-                      }
-                      onMouseOut={(e) =>
-                        (e.target.style.background = "#2563eb")
-                      }
                     >
-                      <ExternalLink size={32} />
-                      OPEN IN GOOGLE MAPS
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          marginBottom: "8px",
+                          fontWeight: "600",
+                        }}
+                      >
+                        <MapPin size={20} />
+                        Delivery Address
+                      </div>
+                      {addressLines.map((line, i) => (
+                        <div
+                          key={i}
+                          style={{ fontSize: "15px", lineHeight: 1.6 }}
+                        >
+                          {line || "—"}
+                        </div>
+                      ))}
                     </a>
                   ) : (
                     <div
                       style={{
-                        textAlign: "center",
-                        background: "#fee2e2",
-                        color: "#991b1b",
-                        fontWeight: "bold",
-                        padding: "16px",
+                        background: "#fee",
                         borderRadius: "16px",
+                        padding: "16px",
+                        marginBottom: "20px",
+                        color: "#991b1b",
+                        textAlign: "center",
                       }}
                     >
-                      ⚠️ No GPS location available
+                      ⚠️ No location available
                     </div>
                   )}
+
+                  {/* Action Buttons */}
+                  <div style={{ display: "flex", gap: "12px" }}>
+                    {/* Big Map Button */}
+                    {order.lat && order.lng && (
+                      <a
+                        href={`https://www.google.com/maps?q=${order.lat},${order.lng}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          flex: 1,
+                          background: "#3b82f6",
+                          color: "white",
+                          fontSize: "24px",
+                          fontWeight: "bold",
+                          padding: "22px",
+                          borderRadius: "24px",
+                          border: "none",
+                          textDecoration: "none",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "12px",
+                          boxShadow: "0 10px 30px rgba(59,130,246,0.4)",
+                        }}
+                      >
+                        <ExternalLink size={28} />
+                        OPEN MAP
+                      </a>
+                    )}
+
+                    {/* Mark Delivered Button */}
+                    <button
+                      onClick={() => markAsDelivered(order._id)}
+                      disabled={updatingId === order._id}
+                      style={{
+                        flex: 1,
+                        background: "#10b981",
+                        color: "white",
+                        fontSize: "24px",
+                        fontWeight: "bold",
+                        padding: "22px",
+                        borderRadius: "24px",
+                        border: "none",
+                        cursor: "pointer",
+                        boxShadow: "0 10px 30px rgba(16,185,129,0.4)",
+                        opacity: updatingId === order._id ? 0.7 : 1,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "12px",
+                      }}
+                    >
+                      <CheckCircle size={28} />
+                      MARK DELIVERED
+                    </button>
+                  </div>
                 </div>
               );
             })}
           </div>
         )}
-      </main>
+      </div>
+
+      {/* History Modal */}
+      {showHistory && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.7)",
+            zIndex: 200,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+          onClick={() => setShowHistory(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "white",
+              borderRadius: "24px",
+              maxWidth: "800px",
+              width: "100%",
+              maxHeight: "90vh",
+              overflow: "auto",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+            }}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                position: "sticky",
+                top: 0,
+                background: "white",
+                borderBottom: "2px solid #e5e7eb",
+                padding: "20px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                borderRadius: "24px 24px 0 0",
+              }}
+            >
+              <h2
+                style={{
+                  margin: 0,
+                  fontSize: "24px",
+                  fontWeight: "bold",
+                  color: "#1f2937",
+                }}
+              >
+                Delivery History
+              </h2>
+              <button
+                onClick={() => setShowHistory(false)}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: "8px",
+                }}
+              >
+                <X size={28} color="#6b7280" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div style={{ padding: "20px" }}>
+              {historyLoading ? (
+                <div
+                  style={{
+                    textAlign: "center",
+                    padding: "40px",
+                    color: "#6b7280",
+                  }}
+                >
+                  Loading history...
+                </div>
+              ) : deliveryHistory.length === 0 ? (
+                <div
+                  style={{
+                    textAlign: "center",
+                    padding: "40px",
+                    color: "#9ca3af",
+                  }}
+                >
+                  No delivery history yet
+                </div>
+              ) : (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "16px",
+                  }}
+                >
+                  {deliveryHistory.map((order) => (
+                    <div
+                      key={order._id}
+                      style={{
+                        background: "#f9fafb",
+                        borderRadius: "16px",
+                        padding: "16px",
+                        border: "1px solid #e5e7eb",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          marginBottom: "12px",
+                        }}
+                      >
+                        <div>
+                          <div
+                            style={{
+                              fontSize: "18px",
+                              fontWeight: "bold",
+                              color: "#1f2937",
+                            }}
+                          >
+                            {order.user?.name || "Customer"}
+                          </div>
+                          <div style={{ fontSize: "14px", color: "#6b7280" }}>
+                            {order.user?.phone || "No phone"}
+                          </div>
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <div
+                            style={{
+                              fontSize: "20px",
+                              fontWeight: "bold",
+                              color: "#10b981",
+                            }}
+                          >
+                            ₹{order.totalAmount}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "12px",
+                              color: "#6b7280",
+                              marginTop: "4px",
+                            }}
+                          >
+                            {new Date(order.updatedAt).toLocaleString("en-IN")}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Items */}
+                      <div
+                        style={{
+                          background: "white",
+                          borderRadius: "12px",
+                          padding: "12px",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        {(order.items || []).map((item, i) => (
+                          <div
+                            key={i}
+                            style={{
+                              padding: "6px 0",
+                              borderBottom:
+                                i < order.items.length - 1
+                                  ? "1px solid #e5e7eb"
+                                  : "none",
+                              fontSize: "14px",
+                              color: "#374151",
+                            }}
+                          >
+                            {item.name} × {item.quantity}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Status Badge */}
+                      <div
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          background: "#d1fae5",
+                          color: "#065f46",
+                          padding: "6px 12px",
+                          borderRadius: "8px",
+                          fontSize: "13px",
+                          fontWeight: "600",
+                        }}
+                      >
+                        <CheckCircle size={16} />
+                        {order.status}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>
+        {`
+          @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+          @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+          }
+        `}
+      </style>
     </div>
   );
 };
